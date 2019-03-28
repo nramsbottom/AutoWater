@@ -1,14 +1,19 @@
 
-int sensor_pin             = A0;     // sensor input. analog.
-int sensor_power_pin       = 7;      // power up this pin to wake the sensor. digital.
-int relay_pin              = 8;      // signal pin for relay. digital.
-int sensor_high_mark       = 90;     // calibrated "wet" value for the sensor
-int sensor_low_mark        = 860;    // calibrated "dry" value for the sensor
-int relay_enable_threshold = 45;     // percent
+const int sensor_pin             = A0;     // sensor input. analog.
+const int sensor_power_pin       = 7;      // power up this pin to wake the sensor. digital.
+const int relay_pin              = 8;      // signal pin for relay. digital.
+const int sensor_high_mark       = 90;     // calibrated "wet" value for the sensor
+const int sensor_low_mark        = 860;    // calibrated "dry" value for the sensor
+const int relay_enable_threshold = 45;     // percent
+const int cycle_delay            = 1000;   // poll sensor every x millisseconds
+
+const int EventType_Reading     = 1;
+const int EventType_Low         = 2;
+const int EventType_High        = 3;
+const int EventType_Information = 4;
 
 int sensor_value;
 bool relay_enabled = false;
-int cycle_delay = 1000;
 
 void setup() {
 
@@ -20,7 +25,8 @@ void setup() {
   sensor_off();
   
   Serial.begin(9600);
-  Serial.println("Reading from sensor...");
+
+  output_event_xml(EventType_Information, "Reading from sensor...");
 }
 
 void loop() {
@@ -32,28 +38,22 @@ void loop() {
   // convert the analog value to a percentage
   sensor_value = map(sensor_value, sensor_low_mark, sensor_high_mark, 0, 100);
 
-  Serial.print("Soil moisture level: ");
-  Serial.print(sensor_value);
-  Serial.println("%");
+  output_event_xml(EventType_Reading, String(sensor_value));
 
   if (sensor_value < relay_enable_threshold) {
     if (!relay_enabled) {
-      Serial.print("Moisture below threshold of ");
-      Serial.print(relay_enable_threshold);
-      Serial.println("%. Enabling relay.");
+      output_event_xml(EventType_Low, "Deactivating pump.");
       relay_on();
     }
   } else {
     if (relay_enabled) {
-      Serial.print("Moisture now above threshold of ");
-      Serial.print(relay_enable_threshold);
-      Serial.println("%. Disabling relay.");
+      output_event_xml(EventType_Low, "Activating pump.");
       relay_off();
     }
   }
 
   if (relay_enabled) {
-    Serial.println("Relay is active.");
+    output_event_xml(EventType_Information, "Relay is active.");
   }
 
   delay(cycle_delay);
@@ -70,13 +70,28 @@ void sensor_on() {
 }
 
 void relay_off() {
-  Serial.println("Turning relay off.");
+  output_event_xml(EventType_Information, "Turning relay off.");
   relay_enabled = false;
   digitalWrite(relay_pin, LOW);
 }
 
 void relay_on() {
-  Serial.println("Turning relay on.");
+  output_event_xml(EventType_Information, "Turning relay on.");
   relay_enabled = true;
   digitalWrite(relay_pin, HIGH);
+}
+
+void output_event_xml(int type, String message) {
+  Serial.print("<event>");
+    
+    Serial.print("<type>");
+    Serial.print(type);
+    Serial.print("</type>");
+    
+    Serial.print("<message>");
+    Serial.print(message);
+    Serial.print("</message>");
+    
+  Serial.print("</event>");
+  Serial.println();
 }
